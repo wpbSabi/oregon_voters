@@ -8,6 +8,7 @@
 # The output shows the registered voters by party in 2016, 2020-03, and 2020-08
 
 library(tidyverse)
+library(cowplot)
 
 ### DATA ###
 
@@ -56,26 +57,88 @@ results3 <- merge(voters_2016, import_sen, by = 'house_districts') %>%
 ### OUTPUT CURRENT VOTER REGISTRATION NUMBERS FOR 2020 ELECTION
 
 vote2016 <- results3 %>% 
-  mutate(n_2016 = n) %>%
+  mutate('2016' = n) %>%
   group_by(PARTY) %>% 
-  select(District, Incumbent_Party = Party, Senator, PARTY, n_2016)
+  select(District, Incumbent_Party = Party, Senator, PARTY, '2016')
 vote2018 <- results2 %>%  
-  mutate(n_2018 = n) %>%
+  mutate('2018' = n) %>%
   group_by(PARTY) %>% 
-  select(District, Incumbent_Party = Party, Senator, PARTY, n_2018)
+  select(District, Incumbent_Party = Party, Senator, PARTY, '2018')
 vote2020 <- results1 %>%  
-  mutate(n_2020 = n) %>%
+  mutate('2020' = n) %>%
   group_by(PARTY) %>% 
-  select(District, Incumbent_Party = Party, Senator, PARTY, n_2020)
+  select(District, Incumbent_Party = Party, Senator, PARTY, '2020')
 vote1 <- merge(vote2016, vote2018)
 vote2 <- merge(vote1, vote2020) %>%
-  arrange(District, desc(n_2020))
+  arrange(District, desc('2020'))
 
-electons_2020 <- vote2 %>%
+elections_2020 <- vote2 %>%
   filter(District %in% c(1,2,5,9,10,12,14,18,21,22,23,25,27,28,29,30))
 
 # View elections for 2020 
-view(electons_2020)
+view(elections_2020)
 
 # District 10 (South of Salem) is competitive, and the incumbent party is 3rd in voter registrations
 # District 27 (Bend) is competitive, and the incumbent party is 3rd in voter registrations
+
+district_chart <- function(district){
+  filter_district <- elections_2020 %>% filter(District == district) 
+  d <- filter_district %>% gather(Year,Voters, 5:7)
+  p <- ggplot(d, aes(x=Year,
+                y=Voters,
+                color = PARTY,
+                group = PARTY)) + 
+  geom_point() +
+  geom_line()  +
+  theme_classic() + 
+  ggtitle(paste0("Voter Registration for Senate District ",district))
+  p
+}
+p1 <- district_chart(10)
+p2 <- district_chart(27)
+p3 <- district_chart(5)
+p4 <- district_chart(12)
+
+plot_grid(p1,p2,p3,p4)
+
+# For charts where other parties are grouped together
+Democrat_Nonaffiliated_Republican <- elections_2020 %>%
+  filter(PARTY == 'Democrat' |
+           PARTY == 'Nonaffiliated' |
+           PARTY == 'Republican')
+
+non_Democrat_Nonaffiliated_Republican <- elections_2020 %>%
+  filter(PARTY != 'Democrat' & 
+           PARTY != 'Nonaffiliated' &
+           PARTY != 'Republican') %>%
+  group_by(District, Incumbent_Party, Senator) %>%
+  summarise('2016' = sum(`2016`), 
+            '2018' = sum(`2018`),
+            '2020' = sum(`2020`)) %>%
+  mutate(PARTY = 'Other')
+
+elections_2020_other <- rbind(Democrat_Nonaffiliated_Republican,
+                              non_Democrat_Nonaffiliated_Republican) %>%
+  arrange(District,PARTY)
+
+district_chart_other <- function(district){
+  filter_district <- elections_2020_other %>% filter(District == district) 
+  d <- filter_district %>% gather(Year,Voters, 5:7)
+  p <- ggplot(d, aes(x=Year,
+                     y=Voters,
+                     color = PARTY,
+                     group = PARTY)) + 
+    geom_point() +
+    geom_line()  +
+    theme_classic() + 
+    ggtitle(paste0("Voter Registration for Senate District ",district))
+  p
+}
+o1 <- district_chart_other(10)
+o2 <- district_chart_other(27)
+o3 <- district_chart_other(5)
+o4 <- district_chart_other(12)
+
+plot_grid(o1,o2,o3,o4)
+
+
